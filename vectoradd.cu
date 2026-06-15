@@ -1,9 +1,3 @@
-// vectoradd.cu
-// Assignment 1 — Vector Add (Intro to CUDA)
-// Build:   nvcc -O2 -std=c++17 -lcublas -o vectoradd vectoradd.cu
-// Run:     ./vectoradd [N] [threadsPerBlock]
-// Example: ./vectoradd 10000000 256
-
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
