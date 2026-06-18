@@ -1,16 +1,11 @@
-# Makefile — build vectoradd
 NVCC ?= nvcc
-ARCH ?= native
 CXXSTD ?= c++17
 OPTFLAGS ?= -O2
-LIBS      := -lcublas
 
-all: vectoradd
+all: vectoradd.exe
 
-vectoradd: vectoradd.cu
-	$(NVCC) $(OPTFLAGS) -std=$(CXXSTD) -arch=$(ARCH) -o $@ $< $(LIBS)
+vectoradd.exe: vectoradd.cu
+	$(NVCC) $(OPTFLAGS) -std=$(CXXSTD) -o vectoradd.exe vectoradd.cu
 
 clean:
-	rm -f vectoradd
-
-
+	del /Q vectoradd.exe
