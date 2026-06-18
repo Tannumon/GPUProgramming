@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cuda_runtime.h>
 #include <chrono>
+
 #define CHECK_CUDA(call)                                             \
 do {                                                                 \
     cudaError_t err = call;                                          \
@@ -101,7 +102,6 @@ int main(int argc, char** argv)
     cudaMalloc(&dC, numBytes);
     // printf("malloc dA: %s\n", cudaGetErrorString(err));
 
-
     cudaMemcpy(dA, hA.data(), numBytes, cudaMemcpyHostToDevice);
     cudaMemcpy(dB, hB.data(), numBytes, cudaMemcpyHostToDevice);
 
@@ -110,8 +110,6 @@ int main(int argc, char** argv)
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
-
-
 
     cudaMemset(dC, 0, numBytes);
     cudaEventRecord(start);
@@ -130,8 +128,6 @@ int main(int argc, char** argv)
 
     cudaMemcpy(hC_simple.data(), dC, numBytes, cudaMemcpyDeviceToHost);
 
-
-
     cudaMemset(dC, 0, numBytes);
     cudaEventRecord(start);
 
@@ -145,8 +141,6 @@ int main(int argc, char** argv)
     cudaEventElapsedTime(&timeOptimizedMs, start, stop);
 
     cudaMemcpy(hC_opt.data(), dC, numBytes, cudaMemcpyDeviceToHost);
-
-
 
     cudaMemset(dC, 0, numBytes);
     cudaEventRecord(start);
@@ -162,8 +156,6 @@ int main(int argc, char** argv)
 
     cudaMemcpy(hC_opt_lu.data(), dC, numBytes, cudaMemcpyDeviceToHost);
 
-
-
     auto cpuStart = std::chrono::steady_clock::now();
     vecAddHost(hA, hB, hRef, alpha);
     auto cpuEnd = std::chrono::steady_clock::now();
@@ -178,7 +170,6 @@ int main(int argc, char** argv)
     double timeCpuMs =
         std::chrono::duration<double, std::milli>(cpuEnd - cpuStart).count();
 
-    // ---------------- Results ----------------
     printf("Simple Kernel       : %s\n",
            verify(hRef, hC_simple) ? "PASS" : "FAIL");
 

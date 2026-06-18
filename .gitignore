@@ -1,0 +1,38 @@
+# =========================
+# Executables
+# =========================
+*.exe
+*.out
+*.app
+
+# =========================
+# Build artifacts (MSVC / CUDA)
+# =========================
+*.obj
+*.o
+*.exp
+*.lib
+*.dll
+*.pdb
+
+# =========================
+# CUDA intermediate files
+# =========================
+*.i
+*.ptx
+*.cubin
+*.fatbin
+
+# =========================
+# Build folders (optional but recommended)
+# =========================
+build/
+x64/
+Debug/
+Release/
+
+# =========================
+# OS junk
+# =========================
+.DS_Store
+Thumbs.db
