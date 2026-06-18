@@ -24,7 +24,7 @@
 *.fatbin
 
 # =========================
-# Build folders (optional but recommended)
+# Build folders
 # =========================
 build/
 x64/
