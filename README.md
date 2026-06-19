@@ -1,1 +1,1 @@
-This repository contains implementations of basic parallel programming kernels and algorithms, with a focus on performance and common optimization techniques. The goal is to explore how basic tasks can be accelerated using parallel progamming models and optimized memory access patterns.
+This repo contains implementations of basic parallel programming algorithms, with a focus on performance and common optimization techniques.
