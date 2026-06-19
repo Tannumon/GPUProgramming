@@ -1,1 +1,1 @@
-This repository contains implementations of basic parallel programming algorithms, with a focus on performance and common optimization techniques.
+This repo contains implementations of basic parallel programming algorithms, with a focus on performance and common optimization techniques.
