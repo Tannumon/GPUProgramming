@@ -7,6 +7,7 @@
 #include <cuda_runtime.h>
 #include <chrono>
 
+// Macro to check for CUDA errors
 #define CUDA_CHECK(stmt) do { \
     cudaError_t err = (stmt); \
     if (err != cudaSuccess) { \
@@ -16,9 +17,8 @@
     } \
 } while (0)
 
-static void cpu_sgemm(const float *A, const float *B, float *C,
-                      int M, int N, int K)
-{
+// CPU implementation of matrix multiplication
+static void cpu_sgemm(const float *A, const float *B, float *C, int M, int N, int K) {
     for (int m = 0; m < M; m++) {
         for (int n = 0; n < N; n++) {
             float sum = 0.0f;
@@ -30,18 +30,17 @@ static void cpu_sgemm(const float *A, const float *B, float *C,
     }
 }
 
+// Initialize a vector with random values
 static void init_random(float* v, long long n, unsigned long long seed = 42ULL) {
     std::mt19937_64 gen(seed);
     std::uniform_real_distribution<float> dist(-1.f, 1.f);
     for (long long i = 0; i < n; i++) v[i] = dist(gen);
 }
 
-__global__ void simple_gemm(const float* A, const float* B, float* C,
-                            int M, int N, int K)
-{
+// Simple GPU implementation of matrix multiplication
+__global__ void simple_gemm(const float* A, const float* B, float* C, int M, int N, int K) {
     int row = blockIdx.y * blockDim.y + threadIdx.y;
     int col = blockIdx.x * blockDim.x + threadIdx.x;
-
     if (row < M && col < N) {
         float sum = 0.0f;
         for (int k = 0; k < K; k++) {
@@ -51,10 +50,9 @@ __global__ void simple_gemm(const float* A, const float* B, float* C,
     }
 }
 
-#define TILE 32 // Adjust tile size based on your GPU's shared memory capacity usually 32
-__global__ void tiled_gemm_sm(const float* A, const float* B, float* C,
-                              int M, int N, int K)
-{
+// Tiled GPU implementation of matrix multiplication
+#define TILE 32 // Adjust tile size based on your GPU's shared memory capacity - usually 32
+__global__ void tiled_gemm_sm(const float* A, const float* B, float* C, int M, int N, int K) {
     __shared__ float As[TILE][TILE];
     __shared__ float Bs[TILE][TILE];
 
@@ -62,30 +60,27 @@ __global__ void tiled_gemm_sm(const float* A, const float* B, float* C,
     int col = blockIdx.x * TILE + threadIdx.x;
 
     float sum = 0.0f;
-
     for (int t = 0; t < (K + TILE - 1) / TILE; t++) {
-
         int aCol = t * TILE + threadIdx.x;
         int bRow = t * TILE + threadIdx.y;
 
         As[threadIdx.y][threadIdx.x] =
             (row < M && aCol < K) ? A[row * K + aCol] : 0.0f;
-
         Bs[threadIdx.y][threadIdx.x] =
             (bRow < K && col < N) ? B[bRow * N + col] : 0.0f;
-
         __syncthreads();
 
         for (int i = 0; i < TILE; i++) {
             sum += As[threadIdx.y][i] * Bs[i][threadIdx.x];
         }
-
         __syncthreads();
     }
 
-    if (row < M && col < N)
+    if (row < M && col < N) {
         C[row * N + col] = sum;
+    }
 }
+
 
 int main()
 {
@@ -108,42 +103,50 @@ int main()
 
     for (int i = 0; i < TESTNUM; i++) {
 
+        // Get matrix dimensions for this test case
         int M = M_list[i], N = N_list[i], K = K_list[i];
         names.push_back(std::to_string(M) + "-" + std::to_string(K) + "-" + std::to_string(N));
 
+        // Allocate host and device memory
         size_t sA = M * K * sizeof(float);
         size_t sB = K * N * sizeof(float);
         size_t sC = M * N * sizeof(float);
 
+        // Allocate host memory for matrices A, B, and C (reference and results)
         float *hA = new float[M*K];
         float *hB = new float[K*N];
         float *hC_ref = new float[M*N];
         float *hC_s = new float[M*N];
         float *hC_t = new float[M*N];
 
+        // Initialize matrices with random values
         init_random(hA, M*K);
         init_random(hB, K*N);
 
+        // Initialize the result matrices
         float *dA, *dB, *dC;
         CUDA_CHECK(cudaMalloc(&dA, sA));
         CUDA_CHECK(cudaMalloc(&dB, sB));
         CUDA_CHECK(cudaMalloc(&dC, sC));
 
+        // Copy matrices A and B from host to device
         CUDA_CHECK(cudaMemcpy(dA, hA, sA, cudaMemcpyHostToDevice));
         CUDA_CHECK(cudaMemcpy(dB, hB, sB, cudaMemcpyHostToDevice));
 
+        // Compute the reference result on the CPU
         auto t1 = std::chrono::high_resolution_clock::now();
         cpu_sgemm(hA, hB, hC_ref, M, N, K);
         auto t2 = std::chrono::high_resolution_clock::now();
-
         double cpu_ms = std::chrono::duration<double, std::milli>(t2 - t1).count();
 
+        // Compute the simple result on the GPU
         dim3 block(TILE, TILE);
         dim3 grid((N + TILE - 1) / TILE, (M + TILE - 1) / TILE);
 
         CUDA_CHECK(cudaMemset(dC, 0, sC));
         CUDA_CHECK(cudaEventRecord(start));
 
+        // Repeat the simple GEMM kernel multiple times for averaging
         for (int r = 0; r < repeat; r++)
             simple_gemm<<<grid, block>>>(dA, dB, dC, M, N, K);
 
@@ -159,6 +162,7 @@ int main()
         CUDA_CHECK(cudaMemset(dC, 0, sC));
         CUDA_CHECK(cudaEventRecord(start));
 
+        // Repeat the tiled GEMM kernel multiple times for averaging
         for (int r = 0; r < repeat; r++)
             tiled_gemm_sm<<<grid, block>>>(dA, dB, dC, M, N, K);
 
@@ -180,6 +184,7 @@ int main()
         int ok = !check(hC_ref, hC_s) && !check(hC_ref, hC_t);
         pass += ok;
 
+        // Output the results and timings for each kernel
         printf("[%s]: simple=%s tiled=%s\n",
                names[i].c_str(),
                check(hC_ref, hC_s) ? "FAIL" : "PASS",
@@ -189,11 +194,18 @@ int main()
         times[i][1] = simple_ms;
         times[i][2] = tiled_ms;
 
-        cudaFree(dA); cudaFree(dB); cudaFree(dC);
-        delete[] hA; delete[] hB;
-        delete[] hC_ref; delete[] hC_s; delete[] hC_t;
+        // Free device memory and host memory
+        cudaFree(dA); 
+        cudaFree(dB); 
+        cudaFree(dC);
+        delete[] hA; 
+        delete[] hB;
+        delete[] hC_ref; 
+        delete[] hC_s; 
+        delete[] hC_t;
     }
 
+    // Output the final result
     printf("\n[%d/%d] %s\n", pass, TESTNUM,
            pass == TESTNUM ? "PASS" : "FAIL");
 
