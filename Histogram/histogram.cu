@@ -7,14 +7,22 @@
 #include <algorithm>
 #include <cuda_runtime.h>
 
-#define CUDA_CHECK(stmt) do { cudaError_t err = (stmt); if (err != cudaSuccess) { fprintf(stderr, "CUDA ERROR: %s\n", cudaGetErrorString(err)); std::exit(EXIT_FAILURE); } } while (0)
+// Macro to check for CUDA errors
+#define CUDA_CHECK(stmt) do { \
+    cudaError_t err = (stmt); \
+    if (err != cudaSuccess) { \
+        fprintf(stderr, "CUDA ERROR %s (%d): %s\n", \
+                #stmt, int(err), cudaGetErrorString(err)); \
+        exit(EXIT_FAILURE); \
+    } \
+} while (0)
 
 #ifndef NUM_BINS
 #define NUM_BINS 256
 #endif
-
 #define COARSE_FACTOR 64
 
+// Computing the histogram on the GPU with a private memory approach
 __global__ void histogram_private_kernel(unsigned char* image, unsigned int* bins, unsigned int width, unsigned int height) {
     __shared__ int Bgv_s[NUM_BINS];
     for (unsigned int bin = threadIdx.x; bin < NUM_BINS; bin += blockDim.x) {
@@ -36,6 +44,7 @@ __global__ void histogram_private_kernel(unsigned char* image, unsigned int* bin
     } 
 }
 
+// Computing the histogram on the GPU with a private memory approach
 void histogram_gpu_private(unsigned char* image, unsigned int* bins, unsigned int width, unsigned int height) {
     unsigned int numThreadsPerBlock = 1024;
     unsigned int total = width * height;
@@ -43,6 +52,7 @@ void histogram_gpu_private(unsigned char* image, unsigned int* bins, unsigned in
     histogram_private_kernel<<<numBlocks, numThreadsPerBlock>>>(image, bins, width, height);
 }
 
+// Computing the histogram on the GPU with a coarse-grained approach
 __global__ void histogram_private_coarse_kernel(unsigned char* image, unsigned int* bins, unsigned int width, unsigned int height) {
     __shared__ unsigned int Bgv_s[NUM_BINS];
     for (unsigned int bin = threadIdx.x; bin < NUM_BINS; bin += COARSE_FACTOR) {
@@ -67,6 +77,7 @@ __global__ void histogram_private_coarse_kernel(unsigned char* image, unsigned i
     }  
 }
 
+// Computing the histogram on the GPU with a coarse-grained approach
 void histogram_gpu_private_coarse(unsigned char* image, unsigned int* bins, unsigned int width, unsigned int height) {
     unsigned int numThreadsPerBlock = 256;
     unsigned int total = width * height;
@@ -74,17 +85,20 @@ void histogram_gpu_private_coarse(unsigned char* image, unsigned int* bins, unsi
     histogram_private_coarse_kernel<<<numBlocks, numThreadsPerBlock>>>(image, bins, width, height);
 }
 
+// Computing the histogram on the CPU
 static void cpu_histogram(const unsigned char* img, unsigned int* bins, unsigned int n) {
     for (unsigned int b = 0; b < NUM_BINS; ++b) bins[b] = 0u;
     for (unsigned int i = 0; i < n; ++i) bins[img[i]]++;
 }
 
+// Initialize a vector with random values
 static void init_random_u8(unsigned char* v, unsigned int n, unsigned long long seed) {
     std::mt19937_64 gen(seed);
     std::uniform_int_distribution<int> dist(0, 255);
     for (unsigned int i = 0; i < n; ++i) v[i] = (unsigned char)dist(gen);
 }
 
+// Verify that two arrays are equal
 static int verify_equal(const unsigned int* a, const unsigned int* b, int n){
     for (int i = 0; i < n; ++i){
         if (a[i] != b[i]) {
@@ -96,11 +110,13 @@ static int verify_equal(const unsigned int* a, const unsigned int* b, int n){
 }
 
 int main(int argc, char** argv){
+    // Check command line arguments
     if (argc < 3){
         fprintf(stderr, "Usage: %s <width> <height> [repeat]\n", argv[0]);
         return EXIT_FAILURE;
     }
 
+    // Parse command line arguments
     int w_in = std::atoi(argv[1]);
     int h_in = std::atoi(argv[2]);
     int repeat = (argc >= 4) ? std::atoi(argv[3]) : 10;
@@ -111,8 +127,9 @@ int main(int argc, char** argv){
     unsigned int height = h_in;
     unsigned int N = width * height;
 
-    std::vector<unsigned char> h_img(N);
-    std::vector<unsigned int> h_ref(NUM_BINS), h_gpu_private(NUM_BINS), h_gpu_coarse(NUM_BINS);
+    // Initialize the image and histogram vectors
+    vector<unsigned char> h_img(N);
+    vector<unsigned int> h_ref(NUM_BINS), h_gpu_private(NUM_BINS), h_gpu_coarse(NUM_BINS);
 
     init_random_u8(h_img.data(), N, 1234ULL);
 
